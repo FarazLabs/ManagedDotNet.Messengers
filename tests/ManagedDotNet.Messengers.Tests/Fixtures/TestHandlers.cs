@@ -6,25 +6,18 @@ namespace ManagedDotNet.Messengers.Tests.Fixtures;
 
 public sealed class Recorder
 {
-    public List<(MessengerEvent Message, EventEnvelope<MessengerEvent> Envelope, Type Handler)> Calls { get; } = new();
+    public List<(MessengerEvent Message, EventEnvelope Envelope, Type Handler)> Calls { get; } = new();
+
+    public List<(string Name, EventEnvelope Envelope)> InterceptorCalls { get; } = new();
 }
 
 public sealed class TextHandler(Recorder recorder) : IMessengerMessageHandler<TextMessageReceived>
 {
     public Task Handle(EventEnvelope<TextMessageReceived> envelope, CancellationToken cancellationToken)
     {
-        recorder.Calls.Add((envelope.Event, AsBase(envelope), typeof(TextHandler)));
+        recorder.Calls.Add((envelope.Event, envelope, typeof(TextHandler)));
         return Task.CompletedTask;
     }
-
-    private static EventEnvelope<MessengerEvent> AsBase(EventEnvelope<TextMessageReceived> envelope) =>
-        new()
-        {
-            Event = envelope.Event,
-            User = envelope.User,
-            Chat = envelope.Chat,
-            CorrelationId = envelope.CorrelationId,
-        };
 }
 
 public sealed class OtherTextHandler : IMessengerMessageHandler<TextMessageReceived>
@@ -39,22 +32,40 @@ public sealed class MediaHandler(Recorder recorder) :
 {
     public Task Handle(EventEnvelope<VoiceMessageReceived> envelope, CancellationToken cancellationToken)
     {
-        recorder.Calls.Add((envelope.Event, AsBase(envelope), typeof(MediaHandler)));
+        recorder.Calls.Add((envelope.Event, envelope, typeof(MediaHandler)));
         return Task.CompletedTask;
     }
 
     public Task Handle(EventEnvelope<ButtonClicked> envelope, CancellationToken cancellationToken)
     {
-        recorder.Calls.Add((envelope.Event, AsBase(envelope), typeof(MediaHandler)));
+        recorder.Calls.Add((envelope.Event, envelope, typeof(MediaHandler)));
         return Task.CompletedTask;
     }
+}
 
-    private static EventEnvelope<MessengerEvent> AsBase<T>(EventEnvelope<T> envelope) where T : MessengerEvent =>
-        new()
-        {
-            Event = envelope.Event,
-            User = envelope.User,
-            Chat = envelope.Chat,
-            CorrelationId = envelope.CorrelationId,
-        };
+public sealed class FirstInterceptor(Recorder recorder) : IMessengerEventInterceptor
+{
+    public async Task Intercept(EventEnvelope envelope, Func<Task> next, CancellationToken cancellationToken)
+    {
+        recorder.InterceptorCalls.Add(("first", envelope));
+        await next();
+    }
+}
+
+public sealed class SecondInterceptor(Recorder recorder) : IMessengerEventInterceptor
+{
+    public async Task Intercept(EventEnvelope envelope, Func<Task> next, CancellationToken cancellationToken)
+    {
+        recorder.InterceptorCalls.Add(("second", envelope));
+        await next();
+    }
+}
+
+public sealed class ShortCircuitInterceptor(Recorder recorder) : IMessengerEventInterceptor
+{
+    public Task Intercept(EventEnvelope envelope, Func<Task> next, CancellationToken cancellationToken)
+    {
+        recorder.InterceptorCalls.Add(("short-circuit", envelope));
+        return Task.CompletedTask;
+    }
 }

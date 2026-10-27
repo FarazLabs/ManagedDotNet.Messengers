@@ -4,11 +4,11 @@ Channel-agnostic messenger contracts, typed inbound event handlers registered pe
 
 | Folder | Namespace | Role |
 | --- | --- | --- |
-| `Abstractions/` | `.Abstractions` | `IMessengerBroker`, `IMessengerMessageHandler<T>`, `IMessengerEventHandler` |
+| `Abstractions/` | `.Abstractions` | `IMessengerBroker`, `IMessengerMessageHandler<T>`, `IMessengerEventHandler`, `IMessengerEventInterceptor` |
 | `Types/Events/` | `.Types.Events` | Inbound events: `TextMessageReceived`, `VoiceMessageReceived`, `ButtonClicked`, `TextMessageEdited` |
-| `Types/Models/` | `.Types.Models` | `EventEnvelope<T>`, `ChatData`, `UserData`, `Button` |
+| `Types/Models/` | `.Types.Models` | `EventEnvelope`, `EventEnvelope<T>`, `ChatData`, `UserData`, `Button` |
 | `Core/` | `.Core` | `MessengerBroker`, dispatcher, Telegram transport/polling/mappers |
-| `Configuration/` | `.Configuration` | `AddTelegram(...)`, `WithEventHandler<TEvent, THandler>()`, options |
+| `Configuration/` | `.Configuration` | `AddTelegram(...)`, `UseHandler<TEvent, TEventHandler>()`, `UseInterceptor<TInterceptor>()`, options |
 | `Types/Enums/` | `.Types.Enums` | `Messenger` |
 | `Types/Exceptions/` | `.Types.Exceptions` | `MisconfiguredException` |
 
@@ -20,17 +20,18 @@ dotnet add package ManagedDotNet.Messengers
 
 ## Host setup
 
-Bind each event type to a handler explicitly:
+Bind each event type to a handler explicitly. Interceptors are optional and run in registration order before the handler:
 
 ```csharp
 using ManagedDotNet.Messengers.Configuration;
 using ManagedDotNet.Messengers.Types.Events;
 
 builder.Services.AddTelegram(builder.Configuration)   // or AddTelegram(o => o.BotToken = "...")
-    .WithEventHandler<TextMessageReceived, TextMessageHandler>()
-    .WithEventHandler<TextMessageEdited, TelegramEditTextMessageHandler>()
-    .WithEventHandler<VoiceMessageReceived, MediaHandler>()
-    .WithEventHandler<ButtonClicked, MediaHandler>();
+    .UseInterceptor<LoggingInterceptor>()
+    .UseHandler<TextMessageReceived, TextMessageHandler>()
+    .UseHandler<TextMessageEdited, TelegramEditTextMessageHandler>()
+    .UseHandler<VoiceMessageReceived, MediaHandler>()
+    .UseHandler<ButtonClicked, MediaHandler>();
 ```
 
 ```json
@@ -45,7 +46,7 @@ builder.Services.AddTelegram(builder.Configuration)   // or AddTelegram(o => o.B
 
 ## Inbound: handlers
 
-Implement `IMessengerMessageHandler<TEvent>` for each event type the class handles, then register each pair with `WithEventHandler<TEvent, THandler>()`.
+Implement `IMessengerMessageHandler<TEvent>` for each event type the class handles, then register each pair with `UseHandler<TEvent, TEventHandler>()`.
 
 ```csharp
 using ManagedDotNet.Messengers.Abstractions;
@@ -73,19 +74,38 @@ public sealed class MediaHandler :
 }
 ```
 
-`EventEnvelope<T>` carries:
+## Inbound: interceptors
+
+Implement `IMessengerEventInterceptor` (not tied to an event type). Register with `UseInterceptor<TInterceptor>()`. Interceptors receive the same `EventEnvelope` instance the handler will get. Call `next` to continue; omit it to short-circuit.
+
+```csharp
+using ManagedDotNet.Messengers.Abstractions;
+using ManagedDotNet.Messengers.Types.Models;
+
+public sealed class LoggingInterceptor(ILogger<LoggingInterceptor> logger) : IMessengerEventInterceptor
+{
+    public async Task Intercept(EventEnvelope envelope, Func<Task> next, CancellationToken ct)
+    {
+        logger.LogInformation("Inbound {EventType} {CorrelationId}", envelope.Event.GetType().Name, envelope.CorrelationId);
+        await next();
+    }
+}
+```
+
+`EventEnvelope` / `EventEnvelope<T>` carries:
 
 | Property | Meaning |
 | --- | --- |
-| `Event` | Typed inbound payload |
+| `Event` | Inbound payload (`MessengerEvent` on the base; typed on `EventEnvelope<T>`) |
 | `User` | `AccountId`, `UserName`, `Name`, `Picture`, `Language` |
 | `Chat` | `Source` (messenger) and `ChatId` — also used for outbound `IMessengerBroker.Send` |
 | `CorrelationId` | Platform update id (logs / retries) |
 
 Rules:
 
-- Handlers are registered with `TryAddScoped` (safe to bind the same handler type to several events or messengers) and resolved in a fresh scope per update.
+- Handlers and interceptors are registered with `TryAddScoped` (safe to bind the same type more than once) and resolved in a fresh scope per update.
 - One handler per event type per messenger. A second binding for the same pair throws `MisconfiguredException`. Calling `AddTelegram` twice also throws.
+- Interceptors for a messenger run in registration order, then the typed handler. The dispatcher builds one envelope and shares it through the pipeline.
 - At host start, any concrete `MessengerEvent` with no handler on a registered messenger logs a **Warning** (does not throw). Those updates are skipped at Debug when they arrive.
 - Each update runs in the background; handler exceptions are logged and do not stop polling.
 

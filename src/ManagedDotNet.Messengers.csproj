@@ -15,7 +15,7 @@
     <Title>ManagedDotNet.Messengers</Title>
     <Description>
       Messenger abstractions and adapters for .NET: IMessengerBroker, EventEnvelope handlers via
-      WithEventHandler&lt;TEvent, THandler&gt;, and a Telegram Bot API client with long-polling.
+      UseHandler&lt;TEvent, TEventHandler&gt;, UseInterceptor&lt;TInterceptor&gt;, and a Telegram Bot API client with long-polling.
     </Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>

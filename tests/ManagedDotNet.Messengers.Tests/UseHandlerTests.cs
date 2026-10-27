@@ -16,12 +16,12 @@ public class UseHandlerTests
         services.AddTelegram(o => o.BotToken = "test-token");
 
     [Fact]
-    public void WithEventHandler_registers_binding_and_scoped_handler()
+    public void UseHandler_registers_binding_and_scoped_handler()
     {
         var services = new ServiceCollection();
 
         AddTelegram(services)
-            .WithEventHandler<TextMessageReceived, TextHandler>();
+            .UseHandler<TextMessageReceived, TextHandler>();
 
         var registry = MessengerEventHandlerRegistry.GetOrCreate(services);
         Assert.True(registry.TryGetBinding(Messenger.Telegram, typeof(TextMessageReceived), out var binding));
@@ -30,13 +30,13 @@ public class UseHandlerTests
     }
 
     [Fact]
-    public void WithEventHandler_can_bind_same_handler_to_multiple_events()
+    public void UseHandler_can_bind_same_handler_to_multiple_events()
     {
         var services = new ServiceCollection();
 
         AddTelegram(services)
-            .WithEventHandler<VoiceMessageReceived, MediaHandler>()
-            .WithEventHandler<ButtonClicked, MediaHandler>();
+            .UseHandler<VoiceMessageReceived, MediaHandler>()
+            .UseHandler<ButtonClicked, MediaHandler>();
 
         var registry = MessengerEventHandlerRegistry.GetOrCreate(services);
         Assert.True(registry.TryGetBinding(Messenger.Telegram, typeof(VoiceMessageReceived), out var voice));
@@ -48,13 +48,31 @@ public class UseHandlerTests
     }
 
     [Fact]
+    public void UseInterceptor_registers_in_order_and_scoped()
+    {
+        var services = new ServiceCollection();
+
+        AddTelegram(services)
+            .UseInterceptor<FirstInterceptor>()
+            .UseInterceptor<SecondInterceptor>()
+            .UseHandler<TextMessageReceived, TextHandler>();
+
+        var registry = MessengerEventHandlerRegistry.GetOrCreate(services);
+        Assert.Equal(
+            new[] { typeof(FirstInterceptor), typeof(SecondInterceptor) },
+            registry.GetInterceptors(Messenger.Telegram));
+        Assert.Contains(services, d => d.ServiceType == typeof(FirstInterceptor) && d.Lifetime == ServiceLifetime.Scoped);
+        Assert.Contains(services, d => d.ServiceType == typeof(SecondInterceptor) && d.Lifetime == ServiceLifetime.Scoped);
+    }
+
+    [Fact]
     public void Duplicate_event_type_on_same_messenger_throws()
     {
         var builder = AddTelegram(new ServiceCollection())
-            .WithEventHandler<TextMessageReceived, TextHandler>();
+            .UseHandler<TextMessageReceived, TextHandler>();
 
         var ex = Assert.Throws<MisconfiguredException>(() =>
-            builder.WithEventHandler<TextMessageReceived, OtherTextHandler>());
+            builder.UseHandler<TextMessageReceived, OtherTextHandler>());
         Assert.Contains(nameof(TextMessageReceived), ex.Message);
     }
 
@@ -76,7 +94,7 @@ public class UseHandlerTests
         services.AddSingleton(new Recorder());
 
         AddTelegram(services)
-            .WithEventHandler<TextMessageReceived, TextHandler>();
+            .UseHandler<TextMessageReceived, TextHandler>();
 
         await using ServiceProvider sp = services.BuildServiceProvider();
         IHostedService coverage = sp.GetServices<IHostedService>()

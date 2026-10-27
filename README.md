@@ -1,6 +1,6 @@
 # ManagedDotNet.Messengers
 
-Messenger abstractions and adapters for .NET (FarazLabs): register a messenger, bind typed event handlers with `WithEventHandler<TEvent, THandler>()`, send through `IMessengerBroker`.
+Messenger abstractions and adapters for .NET (FarazLabs): register a messenger, bind typed event handlers with `UseHandler<TEvent, TEventHandler>()`, optional `UseInterceptor<TInterceptor>()`, send through `IMessengerBroker`.
 
 ```bash
 dotnet add package ManagedDotNet.Messengers
@@ -11,10 +11,11 @@ using ManagedDotNet.Messengers.Configuration;
 using ManagedDotNet.Messengers.Types.Events;
 
 services.AddTelegram(o => o.BotToken = "...")
-    .WithEventHandler<TextMessageReceived, TextMessageHandler>()
-    .WithEventHandler<TextMessageEdited, TelegramEditTextMessageHandler>()
-    .WithEventHandler<VoiceMessageReceived, MediaHandler>()
-    .WithEventHandler<ButtonClicked, MediaHandler>();
+    .UseInterceptor<LoggingInterceptor>()
+    .UseHandler<TextMessageReceived, TextMessageHandler>()
+    .UseHandler<TextMessageEdited, TelegramEditTextMessageHandler>()
+    .UseHandler<VoiceMessageReceived, MediaHandler>()
+    .UseHandler<ButtonClicked, MediaHandler>();
 ```
 
 Uncovered concrete event types log a **Warning** at host start (no throw). Full docs: [src/README.md](src/README.md).

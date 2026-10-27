@@ -6,7 +6,7 @@ namespace ManagedDotNet.Messengers.Abstractions;
 /// <summary>
 /// Marker for messenger event handlers.
 /// Implement <see cref="IMessengerMessageHandler{TEvent}"/> and register with
-/// <c>WithEventHandler&lt;TEvent, THandler&gt;()</c>.
+/// <c>UseHandler&lt;TEvent, TEventHandler&gt;()</c>.
 /// </summary>
 public interface IMessengerEventHandler;
 

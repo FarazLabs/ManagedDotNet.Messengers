@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace ManagedDotNet.Messengers.Core;
 
 /// <summary>
-/// Resolves the handler registered for an inbound message and invokes it in its own DI scope.
+/// Resolves interceptors and the handler registered for an inbound message and invokes them in one DI scope.
 /// </summary>
 internal sealed class MessengerEventDispatcher : IMessengerEventDispatcher
 {
@@ -44,7 +44,25 @@ internal sealed class MessengerEventDispatcher : IMessengerEventDispatcher
         }
 
         await using AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
-        object handler = scope.ServiceProvider.GetRequiredService(binding.HandlerType);
-        await binding.Invoke(handler, message, chatData, userData, correlationId, cancellationToken);
+        IServiceProvider sp = scope.ServiceProvider;
+
+        object handler = sp.GetRequiredService(binding.HandlerType);
+        EventEnvelope envelope = binding.CreateEnvelope(message, chatData, userData, correlationId);
+
+        IReadOnlyList<Type> interceptorTypes = _registry.GetInterceptors(chatData.Source);
+        IMessengerEventInterceptor[] interceptors = new IMessengerEventInterceptor[interceptorTypes.Count];
+        for (int i = 0; i < interceptorTypes.Count; i++)
+            interceptors[i] = (IMessengerEventInterceptor)sp.GetRequiredService(interceptorTypes[i]);
+
+        Func<Task> next = () => binding.Invoke(handler, envelope, cancellationToken);
+
+        for (int i = interceptors.Length - 1; i >= 0; i--)
+        {
+            IMessengerEventInterceptor interceptor = interceptors[i];
+            Func<Task> continuePipeline = next;
+            next = () => interceptor.Intercept(envelope, continuePipeline, cancellationToken);
+        }
+
+        await next();
     }
 }

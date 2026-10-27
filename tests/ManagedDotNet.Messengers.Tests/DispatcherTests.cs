@@ -35,9 +35,9 @@ public class DispatcherTests
     public async Task Invokes_registered_handler_with_message_and_context()
     {
         var (provider, recorder) = Build(b => b
-            .WithEventHandler<TextMessageReceived, TextHandler>()
-            .WithEventHandler<VoiceMessageReceived, MediaHandler>()
-            .WithEventHandler<ButtonClicked, MediaHandler>());
+            .UseHandler<TextMessageReceived, TextHandler>()
+            .UseHandler<VoiceMessageReceived, MediaHandler>()
+            .UseHandler<ButtonClicked, MediaHandler>());
         var dispatcher = provider.GetRequiredService<IMessengerEventDispatcher>();
         var chat = TelegramChat();
         var user = TelegramUser();
@@ -57,8 +57,8 @@ public class DispatcherTests
     public async Task Routes_each_message_type_of_a_multi_handler()
     {
         var (provider, recorder) = Build(b => b
-            .WithEventHandler<VoiceMessageReceived, MediaHandler>()
-            .WithEventHandler<ButtonClicked, MediaHandler>());
+            .UseHandler<VoiceMessageReceived, MediaHandler>()
+            .UseHandler<ButtonClicked, MediaHandler>());
         var dispatcher = provider.GetRequiredService<IMessengerEventDispatcher>();
 
         await dispatcher.DispatchAsync("1", new VoiceMessageReceived { FileId = "f" }, TelegramChat(), TelegramUser(), CancellationToken.None);
@@ -73,8 +73,8 @@ public class DispatcherTests
     public async Task Skips_message_without_handler()
     {
         var (provider, recorder) = Build(b => b
-            .WithEventHandler<VoiceMessageReceived, MediaHandler>()
-            .WithEventHandler<ButtonClicked, MediaHandler>());
+            .UseHandler<VoiceMessageReceived, MediaHandler>()
+            .UseHandler<ButtonClicked, MediaHandler>());
         var dispatcher = provider.GetRequiredService<IMessengerEventDispatcher>();
 
         await dispatcher.DispatchAsync(
@@ -84,6 +84,50 @@ public class DispatcherTests
             TelegramUser(),
             CancellationToken.None);
 
+        Assert.Empty(recorder.Calls);
+    }
+
+    [Fact]
+    public async Task Runs_interceptors_in_registration_order_with_same_envelope()
+    {
+        var (provider, recorder) = Build(b => b
+            .UseInterceptor<FirstInterceptor>()
+            .UseInterceptor<SecondInterceptor>()
+            .UseHandler<TextMessageReceived, TextHandler>());
+        var dispatcher = provider.GetRequiredService<IMessengerEventDispatcher>();
+
+        await dispatcher.DispatchAsync(
+            "1001",
+            new TextMessageReceived { MessageId = "5", Content = "hi" },
+            TelegramChat(),
+            TelegramUser(),
+            CancellationToken.None);
+
+        Assert.Collection(recorder.InterceptorCalls,
+            c => Assert.Equal("first", c.Name),
+            c => Assert.Equal("second", c.Name));
+
+        var handlerCall = Assert.Single(recorder.Calls);
+        Assert.Same(handlerCall.Envelope, recorder.InterceptorCalls[0].Envelope);
+        Assert.Same(handlerCall.Envelope, recorder.InterceptorCalls[1].Envelope);
+    }
+
+    [Fact]
+    public async Task Short_circuit_interceptor_skips_handler()
+    {
+        var (provider, recorder) = Build(b => b
+            .UseInterceptor<ShortCircuitInterceptor>()
+            .UseHandler<TextMessageReceived, TextHandler>());
+        var dispatcher = provider.GetRequiredService<IMessengerEventDispatcher>();
+
+        await dispatcher.DispatchAsync(
+            "1",
+            new TextMessageReceived { MessageId = "1", Content = "x" },
+            TelegramChat(),
+            TelegramUser(),
+            CancellationToken.None);
+
+        Assert.Single(recorder.InterceptorCalls);
         Assert.Empty(recorder.Calls);
     }
 }

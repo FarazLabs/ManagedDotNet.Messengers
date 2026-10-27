@@ -22,7 +22,7 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers the Telegram <see cref="IMessengerTransport"/>, <see cref="IMessengerBroker"/>, and long-polling
     /// that dispatches inbound messages to handlers registered via
-    /// <see cref="MessengerConfigurationBuilder.WithEventHandler{TEvent, THandler}"/>.
+    /// <see cref="MessengerConfigurationBuilder.UseHandler{TEvent, TEventHandler}"/>.
     /// </summary>
     /// <param name="services">Service collection to configure</param>
     /// <param name="configure">Sets <see cref="TelegramOptions"/> (e.g. <c>BotToken</c>)</param>
