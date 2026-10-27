@@ -1,0 +1,12 @@
+bin/
+obj/
+**/nupkgs/
+*.user
+*.suo
+.vs/
+.cursor/
+.vscode/
+graphify-out/
+*.nupkg
+*.snupkg
+

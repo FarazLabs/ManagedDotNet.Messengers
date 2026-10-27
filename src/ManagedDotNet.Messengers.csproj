@@ -1,0 +1,54 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ManagedDotNet.Messengers</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <PackageId>ManagedDotNet.Messengers</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Faraz Zabihian</Authors>
+    <Company>N/A</Company>
+    <Title>ManagedDotNet.Messengers</Title>
+    <Description>
+      Messenger abstractions and adapters for .NET: IMessengerBroker, EventEnvelope handlers via
+      WithEventHandler&lt;TEvent, THandler&gt;, and a Telegram Bot API client with long-polling.
+    </Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/FarazLabs/ManagedDotNet.Messengers</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/FarazLabs/ManagedDotNet.Messengers</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>
+      Messenger,Telegram,Bot,IMessengerBroker,EventEnvelope,MessageHandler,Chat,WhatsApp,Instagram,ASPNetCore
+    </PackageTags>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageOutputPath>nupkgs</PackageOutputPath>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PublishToGitHubPackages>true</PublishToGitHubPackages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Telegram.Bot" Version="22.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ManagedDotNet.Messengers.Tests" />
+  </ItemGroup>
+
+</Project>
